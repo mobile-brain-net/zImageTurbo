@@ -28,9 +28,23 @@ export default function ImageGenerator() {
   const [error, setError] = useState<string | null>(null);
   const [generatedPrompt, setGeneratedPrompt] = useState<string | null>(null);
   const [generatedAspectRatio, setGeneratedAspectRatio] = useState<AspectRatio | null>(null);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const charsRemaining = MAX_CHARS - prompt.length;
   const isPromptValid = prompt.trim().length > 0 && prompt.length <= MAX_CHARS;
+
+  // Timer logic for elapsed time
+  useEffect(() => {
+    if (!loading || !startTime) return;
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      setElapsedSeconds(elapsed);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [loading, startTime]);
 
   // Polling logic using useEffect
   useEffect(() => {
@@ -59,6 +73,8 @@ export default function ImageGenerator() {
           setTaskId(null);
           setPollingStatus('');
           setPollAttempts(0);
+          setStartTime(null);
+          setElapsedSeconds(0);
         } else if (data.status === 'FAILED') {
           // Failed - display error
           setError(data.error || 'Image generation failed');
@@ -66,6 +82,8 @@ export default function ImageGenerator() {
           setTaskId(null);
           setPollingStatus('');
           setPollAttempts(0);
+          setStartTime(null);
+          setElapsedSeconds(0);
         } else if (data.status === 'IN_PROGRESS') {
           // Still in progress - continue polling
           const newAttempts = pollAttempts + 1;
@@ -78,6 +96,8 @@ export default function ImageGenerator() {
             setTaskId(null);
             setPollingStatus('');
             setPollAttempts(0);
+            setStartTime(null);
+            setElapsedSeconds(0);
           } else {
             // Update status message
             if (newAttempts < 5) {
@@ -99,6 +119,8 @@ export default function ImageGenerator() {
         setTaskId(null);
         setPollingStatus('');
         setPollAttempts(0);
+        setStartTime(null);
+        setElapsedSeconds(0);
       }
     };
 
@@ -122,6 +144,8 @@ export default function ImageGenerator() {
     setPollAttempts(0);
     setPollingStatus('Starting generation...');
     setLoading(true);
+    setStartTime(Date.now());
+    setElapsedSeconds(0);
 
     try {
       const response = await fetch('/api/generate', {
@@ -141,6 +165,8 @@ export default function ImageGenerator() {
         setError(data.error || 'Failed to start generation');
         setLoading(false);
         setPollingStatus('');
+        setStartTime(null);
+        setElapsedSeconds(0);
         return;
       }
 
@@ -152,6 +178,8 @@ export default function ImageGenerator() {
       setError('Failed to connect. Please try again.');
       setLoading(false);
       setPollingStatus('');
+      setStartTime(null);
+      setElapsedSeconds(0);
     }
   };
 
@@ -227,9 +255,17 @@ export default function ImageGenerator() {
           {pollingStatus && (
             <p className="text-center text-gray-600 text-sm">{pollingStatus}</p>
           )}
-          <p className="text-center text-gray-500 text-xs">
-            Attempt {pollAttempts} of {MAX_POLL_ATTEMPTS}
-          </p>
+          <div className="text-center space-y-1">
+            <p className="text-gray-600 text-sm">
+              Elapsed: {elapsedSeconds}s
+            </p>
+            <p className="text-gray-500 text-xs">
+              Est. remaining: ~{Math.max(0, 60 - elapsedSeconds)}s (max 60s)
+            </p>
+            <p className="text-center text-gray-400 text-xs mt-2">
+              Attempt {pollAttempts} of {MAX_POLL_ATTEMPTS}
+            </p>
+          </div>
         </div>
       )}
 
